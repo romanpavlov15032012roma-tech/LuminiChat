@@ -214,6 +214,33 @@ const App: React.FC = () => {
     }
   };
 
+  const handleEditMessage = (messageId: string, newText: string) => {
+    if (!selectedChatId) return;
+
+    const updatedChats = chats.map(chat => {
+        if (chat.id !== selectedChatId) return chat;
+
+        const updatedMessages = chat.messages.map(msg => 
+            msg.id === messageId 
+                ? { ...msg, text: newText, isEdited: true }
+                : msg
+        );
+
+        // Update last message if it was the one edited
+        const updatedLastMessage = chat.lastMessage?.id === messageId
+            ? { ...chat.lastMessage, text: newText, isEdited: true }
+            : chat.lastMessage;
+
+        return {
+            ...chat,
+            messages: updatedMessages,
+            lastMessage: updatedLastMessage
+        };
+    });
+
+    saveChatsToStorage(updatedChats);
+  };
+
   const handleReaction = (messageId: string, emoji: string) => {
       if (!selectedChatId || !currentUser) return;
 
@@ -332,6 +359,7 @@ const App: React.FC = () => {
             chat={selectedChat} 
             currentUser={currentUser}
             onSendMessage={handleSendMessage}
+            onEditMessage={handleEditMessage}
             onBack={handleBackToSidebar}
             onReaction={handleReaction}
           />

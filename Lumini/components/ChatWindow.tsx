@@ -3,13 +3,14 @@ import { Chat, Attachment } from '../types';
 import { User } from '../types';
 import { 
   Send, Paperclip, Smile, MoreVertical, Phone, Video, ArrowLeft, Bot, 
-  X, Image as ImageIcon, FileText, Mic, MicOff, VideoOff, PhoneOff, Plus, Download
+  X, Image as ImageIcon, FileText, Mic, MicOff, VideoOff, PhoneOff, Plus, Download, Pencil, Check
 } from 'lucide-react';
 
 interface ChatWindowProps {
   chat: Chat;
   currentUser: User;
   onSendMessage: (text: string, attachments?: Attachment[]) => void;
+  onEditMessage: (messageId: string, newText: string) => void;
   onBack: () => void;
   onReaction: (messageId: string, emoji: string) => void;
 }
@@ -23,11 +24,15 @@ const INPUT_EMOJIS = [
     '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💔', '❣️'
 ];
 
-export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSendMessage, onBack, onReaction }) => {
+export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSendMessage, onEditMessage, onBack, onReaction }) => {
   const [inputText, setInputText] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<Attachment[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  
+  // Editing state
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
   
   // Call State
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'connected'>('idle');
@@ -38,6 +43,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
   const participant = chat.participants[0];
 
   const scrollToBottom = () => {
@@ -45,8 +51,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [chat.messages, selectedFiles]);
+    // Only auto-scroll if NOT editing (to avoid jumping while editing old messages)
+    if (!editingMessageId) {
+        scrollToBottom();
+    }
+  }, [chat.messages, selectedFiles, editingMessageId]);
+
+  // Focus edit input when editing starts
+  useEffect(() => {
+      if (editingMessageId && editInputRef.current) {
+          editInputRef.current.focus();
+      }
+  }, [editingMessageId]);
 
   // Call Timer
   useEffect(() => {
@@ -73,6 +89,34 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const startEditing = (msg: { id: string, text: string }) => {
+      setEditingMessageId(msg.id);
+      setEditText(msg.text);
+      setHoveredMessageId(null); // Hide hover menu
+  };
+
+  const saveEdit = () => {
+      if (editingMessageId && editText.trim()) {
+          onEditMessage(editingMessageId, editText);
+          setEditingMessageId(null);
+          setEditText('');
+      }
+  };
+
+  const cancelEdit = () => {
+      setEditingMessageId(null);
+      setEditText('');
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          saveEdit();
+      } else if (e.key === 'Escape') {
+          cancelEdit();
+      }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -220,14 +264,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
           const isMe = msg.senderId === currentUser.id;
           const showAvatar = !isMe && (index === 0 || chat.messages[index - 1].senderId !== msg.senderId);
           const isHovered = hoveredMessageId === msg.id;
+          const isEditingThis = editingMessageId === msg.id;
 
           return (
             <div 
                 key={msg.id} 
                 className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-1 animate-slide-up relative group/messageRow`}
-                onMouseEnter={() => setHoveredMessageId(msg.id)}
+                onMouseEnter={() => !isEditingThis && setHoveredMessageId(msg.id)}
                 onMouseLeave={() => setHoveredMessageId(null)}
-                style={{ zIndex: isHovered ? 50 : 'auto' }}
+                style={{ zIndex: isHovered || isEditingThis ? 50 : 'auto' }}
             >
                 {!isMe && (
                     <div className={`w-8 h-8 mr-2 flex-shrink-0 ${showAvatar ? 'opacity-100' : 'opacity-0'}`}>
@@ -244,7 +289,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
                       isMe 
                         ? 'bg-violet-600 text-white rounded-br-sm shadow-violet-900/20' 
                         : 'bg-slate-800 text-slate-200 rounded-bl-sm border border-slate-700 shadow-lg'
-                    }`}
+                    } ${isEditingThis ? 'ring-2 ring-violet-400 ring-offset-2 ring-offset-slate-900' : ''}`}
                   >
                     {/* Attachments */}
                     {msg.attachments && msg.attachments.length > 0 && (
@@ -272,7 +317,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
                         </div>
                     )}
 
-                    <p className="whitespace-pre-wrap text-[15px] leading-relaxed break-words relative z-10">{msg.text}</p>
+                    {isEditingThis ? (
+                        <div className="min-w-[200px]">
+                            <input 
+                                ref={editInputRef}
+                                value={editText}
+                                onChange={(e) => setEditText(e.target.value)}
+                                onKeyDown={handleEditKeyDown}
+                                className="w-full bg-black/20 text-white p-1 rounded focus:outline-none mb-2"
+                            />
+                            <div className="flex justify-end gap-2">
+                                <button onClick={cancelEdit} className="p-1 hover:bg-white/10 rounded"><X size={14} /></button>
+                                <button onClick={saveEdit} className="p-1 bg-white/20 hover:bg-white/30 rounded"><Check size={14} /></button>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="whitespace-pre-wrap text-[15px] leading-relaxed break-words relative z-10">
+                            {msg.text}
+                            {msg.isEdited && <span className="text-[10px] opacity-60 ml-1 italic">(ред.)</span>}
+                        </p>
+                    )}
+
                     <div className={`text-[10px] mt-1 text-right relative z-10 ${isMe ? 'text-violet-200' : 'text-slate-400'}`}>
                       {formatTime(msg.timestamp)}
                       {isMe && (
@@ -303,44 +368,55 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
                       </div>
                   )}
 
-                  {/* Reaction Button (FIXED: Absolute relative to row wrapper, OUTSIDE bubble) */}
+                  {/* Message Actions (Reaction + Edit) */}
                   <div 
-                    className={`absolute top-2 transition-opacity duration-200 z-50 ${isMe ? '-left-8' : '-right-8'} ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+                    className={`absolute top-2 transition-opacity duration-200 z-50 ${isMe ? '-left-16' : '-right-8'} ${isHovered ? 'opacity-100' : 'opacity-0'}`}
                   >
-                      <div className="relative group/reaction">
-                          {/* Invisible bridge prevents closing when moving mouse */}
-                          <div className="absolute -inset-4 bg-transparent z-0 hidden group-hover/reaction:block"></div>
+                      <div className="flex gap-1">
+                          {/* Edit Button (Only for me) */}
+                          {isMe && (
+                              <button 
+                                onClick={() => startEditing(msg)}
+                                className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 shadow-sm border border-slate-700"
+                                title="Редактировать"
+                              >
+                                  <Pencil size={14} />
+                              </button>
+                          )}
 
-                          <button className="relative z-10 p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 shadow-sm border border-slate-700">
-                             <Smile size={14} />
-                          </button>
-                          
-                          {/* Quick Reaction Popover */}
-                          <div className={`absolute bottom-full mb-2 hidden group-hover/reaction:flex z-50 ${isMe ? 'left-0' : 'right-0'}`}>
-                               {/* Bridge for the popover gap */}
-                               <div className="absolute top-full w-full h-4 bg-transparent"></div>
-                               
-                               <div className="bg-slate-800 border border-slate-700 rounded-full shadow-xl p-1.5 flex gap-1 animate-slide-up whitespace-nowrap">
-                                  {REACTION_EMOJIS.map(emoji => (
+                          <div className="relative group/reaction">
+                              {/* Invisible bridge prevents closing when moving mouse */}
+                              <div className="absolute -inset-4 bg-transparent z-0 hidden group-hover/reaction:block"></div>
+
+                              <button className="relative z-10 p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 shadow-sm border border-slate-700">
+                                 <Smile size={14} />
+                              </button>
+                              
+                              {/* Quick Reaction Popover */}
+                              <div className={`absolute bottom-full mb-2 hidden group-hover/reaction:flex z-50 ${isMe ? 'right-0' : 'left-0'}`}>
+                                   {/* Bridge for the popover gap */}
+                                   <div className="absolute top-full w-full h-4 bg-transparent"></div>
+                                   
+                                   <div className="bg-slate-800 border border-slate-700 rounded-full shadow-xl p-1.5 flex gap-1 animate-slide-up whitespace-nowrap">
+                                      {REACTION_EMOJIS.map(emoji => (
+                                          <button 
+                                            key={emoji}
+                                            onClick={() => onReaction(msg.id, emoji)}
+                                            className="w-8 h-8 flex items-center justify-center text-lg hover:bg-slate-700 rounded-full transition-all hover:scale-125 transform"
+                                          >
+                                              {emoji}
+                                          </button>
+                                      ))}
                                       <button 
-                                        key={emoji}
-                                        onClick={() => onReaction(msg.id, emoji)}
-                                        className="w-8 h-8 flex items-center justify-center text-lg hover:bg-slate-700 rounded-full transition-all hover:scale-125 transform"
+                                        onClick={() => {
+                                            onReaction(msg.id, '👍'); 
+                                        }}
+                                        className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-full transition-all"
                                       >
-                                          {emoji}
+                                          <Plus size={16} />
                                       </button>
-                                  ))}
-                                  <button 
-                                    onClick={() => {
-                                        // Simple way to open main picker
-                                        // In real app, this would open a popover anchored here
-                                        onReaction(msg.id, '👍'); 
-                                    }}
-                                    className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 rounded-full transition-all"
-                                  >
-                                      <Plus size={16} />
-                                  </button>
-                               </div>
+                                   </div>
+                              </div>
                           </div>
                       </div>
                   </div>

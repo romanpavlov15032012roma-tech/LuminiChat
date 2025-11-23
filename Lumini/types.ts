@@ -29,6 +29,7 @@ export interface Message {
   status: 'sent' | 'delivered' | 'read';
   reactions?: Reaction[];
   attachments?: Attachment[];
+  isEdited?: boolean; // New field for editing
 }
 
 export interface Chat {
