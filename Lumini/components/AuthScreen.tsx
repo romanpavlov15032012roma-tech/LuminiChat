@@ -19,10 +19,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
     // Simulate network delay
     setTimeout(() => {
+      // Generate a random 6-digit unique code
+      const uniqueCode = Math.floor(100000 + Math.random() * 900000).toString();
+
       const newUser: User = {
         id: 'me', // Keeping 'me' to sync with mock chat data
         name: isRegistering ? name : (email.split('@')[0] || 'User'),
         email: email,
+        phoneNumber: '',
+        uniqueCode: uniqueCode,
         avatar: isRegistering && avatarUrl 
           ? avatarUrl 
           : `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
@@ -35,18 +40,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 relative overflow-hidden transition-colors duration-200">
         {/* Background Effects */}
-        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-violet-600/20 rounded-full blur-[120px] animate-pulse"></div>
-        <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] animate-pulse [animation-delay:2s]"></div>
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-violet-600/10 dark:bg-violet-600/20 rounded-full blur-[120px] animate-pulse"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-indigo-600/10 dark:bg-indigo-600/20 rounded-full blur-[120px] animate-pulse [animation-delay:2s]"></div>
 
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-md relative z-10">
+        <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-xl border border-slate-200 dark:border-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-md relative z-10 transition-colors duration-200">
           <div className="text-center mb-8">
             <div className="w-16 h-16 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-violet-500/30">
               <Sparkles className="text-white w-8 h-8" />
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Lumina Chat</h1>
-            <p className="text-slate-400">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Lumini Chat</h1>
+            <p className="text-slate-500 dark:text-slate-400">
               {isRegistering ? 'Создайте новый аккаунт' : 'С возвращением!'}
             </p>
           </div>
@@ -54,38 +59,38 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {isRegistering && (
               <div>
-                <label className="block text-slate-400 text-sm font-medium mb-1">Имя</label>
+                <label className="block text-slate-600 dark:text-slate-400 text-sm font-medium mb-1">Имя</label>
                 <input
                   type="text"
                   required={isRegistering}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all placeholder-slate-600"
+                  className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all placeholder-slate-400 dark:placeholder-slate-600"
                   placeholder="Как вас зовут?"
                 />
               </div>
             )}
 
             <div>
-              <label className="block text-slate-400 text-sm font-medium mb-1">Email</label>
+              <label className="block text-slate-600 dark:text-slate-400 text-sm font-medium mb-1">Email</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all placeholder-slate-600"
+                className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all placeholder-slate-400 dark:placeholder-slate-600"
                 placeholder="ваш@email.com"
               />
             </div>
 
             {isRegistering && (
                 <div>
-                  <label className="block text-slate-400 text-sm font-medium mb-1">Ссылка на аватар (необязательно)</label>
+                  <label className="block text-slate-600 dark:text-slate-400 text-sm font-medium mb-1">Ссылка на аватар (необязательно)</label>
                   <input
                     type="url"
                     value={avatarUrl}
                     onChange={(e) => setAvatarUrl(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all placeholder-slate-600"
+                    className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all placeholder-slate-400 dark:placeholder-slate-600"
                     placeholder="https://..."
                   />
                 </div>
@@ -109,10 +114,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             </div>
           </form>
           
-          <div className="mt-6 pt-6 border-t border-slate-800 text-center">
+          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800 text-center">
              <button 
                 onClick={() => setIsRegistering(!isRegistering)}
-                className="text-slate-400 hover:text-white text-sm transition-colors"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white text-sm transition-colors"
              >
                 {isRegistering 
                     ? 'Уже есть аккаунт? Войти' 
@@ -120,7 +125,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
              </button>
           </div>
           
-          <div className="mt-6 flex justify-center gap-2 text-xs text-slate-600">
+          <div className="mt-6 flex justify-center gap-2 text-xs text-slate-500 dark:text-slate-600">
              <Lock size={12} />
              <span>Защищенное end-to-end шифрование (Demo)</span>
           </div>

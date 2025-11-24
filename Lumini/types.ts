@@ -3,13 +3,15 @@ export interface User {
   name: string;
   avatar: string;
   email?: string; // Added for auth
+  phoneNumber?: string; // Added for phone search
+  uniqueCode?: string; // Added for unique ID search
   isOnline: boolean;
   isAi?: boolean;
 }
 
 export interface Attachment {
   id: string;
-  type: 'image' | 'file';
+  type: 'image' | 'file' | 'video';
   url: string;
   name: string;
   size?: string;
@@ -26,10 +28,10 @@ export interface Message {
   senderId: string;
   text: string;
   timestamp: Date;
-  status: 'sent' | 'delivered' | 'read';
+  status: 'sending' | 'sent' | 'delivered' | 'read';
   reactions?: Reaction[];
   attachments?: Attachment[];
-  isEdited?: boolean; // New field for editing
+  isEdited?: boolean;
 }
 
 export interface Chat {
