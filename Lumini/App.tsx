@@ -275,10 +275,11 @@ const App: React.FC = () => {
             setTimeout(() => {
                 safeUpdateMessageStatus(selectedChatId, newMessage.id, 'delivered');
 
-                // Simulate Read
+                // Simulate Read (Slightly faster for audio)
+                const readDelay = attachments.length > 0 ? 2500 : 3500;
                 setTimeout(() => {
                     safeUpdateMessageStatus(selectedChatId, newMessage.id, 'read');
-                }, 3500);
+                }, readDelay);
 
             }, 1500);
         }

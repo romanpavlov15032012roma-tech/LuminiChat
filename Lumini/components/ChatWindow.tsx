@@ -3,7 +3,7 @@ import { Chat, Attachment } from '../types';
 import { User } from '../types';
 import { 
   Send, Paperclip, Smile, MoreVertical, Phone, Video, ArrowLeft, Bot, 
-  X, Image as ImageIcon, FileText, Mic, MicOff, VideoOff, PhoneOff, Plus, Download, Pencil, Check, CheckCheck, Clock, Play
+  X, Image as ImageIcon, FileText, Mic, MicOff, VideoOff, PhoneOff, Plus, Download, Pencil, Check, CheckCheck, Clock, Play, Trash2, StopCircle
 } from 'lucide-react';
 
 interface ChatWindowProps {
@@ -40,6 +40,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
+
+  // Audio Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +155,79 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
       setSelectedFiles(prev => prev.filter(f => f.id !== id));
   };
 
+  // --- Voice Recording Logic ---
+
+  const startRecording = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunksRef.current.push(event.data);
+            }
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+        setRecordingDuration(0);
+
+        recordingTimerRef.current = setInterval(() => {
+            setRecordingDuration(prev => prev + 1);
+        }, 1000);
+
+    } catch (e) {
+        console.error("Error accessing microphone:", e);
+        alert("Не удалось получить доступ к микрофону. Проверьте разрешения.");
+    }
+  };
+
+  const stopRecording = (shouldSend: boolean) => {
+      if (mediaRecorderRef.current && isRecording) {
+          mediaRecorderRef.current.stop();
+          mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop()); // Stop mic stream
+          
+          // Wait for stop event to process chunks
+          mediaRecorderRef.current.onstop = () => {
+              if (shouldSend) {
+                  const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                  const reader = new FileReader();
+                  reader.readAsDataURL(audioBlob);
+                  reader.onloadend = () => {
+                      const base64Audio = reader.result as string;
+                      const durationStr = formatDuration(recordingDuration);
+                      
+                      const audioAttachment: Attachment = {
+                          id: Date.now().toString(),
+                          type: 'audio',
+                          url: base64Audio,
+                          name: 'Голосовое сообщение',
+                          duration: durationStr
+                      };
+                      
+                      onSendMessage('', [audioAttachment]);
+                  };
+              }
+          };
+      }
+      
+      if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+      }
+      setIsRecording(false);
+      setRecordingDuration(0);
+      mediaRecorderRef.current = null;
+      audioChunksRef.current = [];
+  };
+
+  const cancelRecording = () => {
+      stopRecording(false);
+  };
+
+  // --- Call Logic ---
+
   const startCall = (type: 'audio' | 'video') => {
       setCallType(type);
       setCallStatus('calling');
@@ -165,7 +245,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
       setCallType(null);
   };
 
-  const formatCallDuration = (seconds: number) => {
+  const formatDuration = (seconds: number) => {
       const mins = Math.floor(seconds / 60);
       const secs = seconds % 60;
       return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
@@ -264,7 +344,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
                  
                  <h2 className="text-2xl font-bold text-white mb-2">{participant.name}</h2>
                  <p className="text-violet-300 font-medium mb-8">
-                     {callStatus === 'calling' ? 'Звонок...' : formatCallDuration(callDuration)}
+                     {callStatus === 'calling' ? 'Звонок...' : formatDuration(callDuration)}
                  </p>
                  
                  <div className="flex items-center gap-6">
@@ -318,7 +398,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
                 )}
               
               {/* Message Row Wrapper */}
-              <div className="relative max-w-[75%] md:max-w-[65%] flex flex-col group/bubbleContainer">
+              <div className="relative max-w-[85%] md:max-w-[70%] flex flex-col group/bubbleContainer">
                   
                   {/* Message Bubble */}
                   <div 
@@ -338,6 +418,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
                                     ) : att.type === 'video' ? (
                                         <div className="rounded-lg overflow-hidden bg-black max-h-60 w-full relative group/video">
                                             <video src={att.url} controls className="w-full h-full object-contain" />
+                                        </div>
+                                    ) : att.type === 'audio' ? (
+                                        <div className={`flex items-center gap-3 p-2 rounded-xl w-60 ${isMe ? 'bg-violet-500/50' : 'bg-slate-100 dark:bg-slate-700'}`}>
+                                            <div className="p-2 rounded-full bg-white/20">
+                                                <Mic size={20} className={isMe ? 'text-white' : 'text-slate-600 dark:text-slate-300'} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <audio src={att.url} controls className="w-full h-8" />
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-3 bg-black/5 dark:bg-black/20 p-3 rounded-lg">
@@ -374,10 +463,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
                         </div>
                     ) : (
                         <div className="flex flex-col">
-                             <p className="whitespace-pre-wrap text-[15px] leading-relaxed break-words relative z-10 pr-2">
-                                {msg.text}
-                                {msg.isEdited && <span className="text-[10px] opacity-60 ml-1 italic">(ред.)</span>}
-                            </p>
+                             {msg.text && (
+                                <p className="whitespace-pre-wrap text-[15px] leading-relaxed break-words relative z-10 pr-2">
+                                    {msg.text}
+                                    {msg.isEdited && <span className="text-[10px] opacity-60 ml-1 italic">(ред.)</span>}
+                                </p>
+                             )}
                             <div className={`text-[10px] mt-1 flex items-center justify-end gap-1.5 ${isMe ? 'text-violet-200/80' : 'text-slate-400 dark:text-slate-500'}`}>
                                 <span>{formatTime(msg.timestamp)}</span>
                                 {isMe && (
@@ -538,49 +629,86 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onSen
         )}
 
         <div className="max-w-4xl mx-auto flex items-end gap-2 bg-slate-100 dark:bg-slate-800/50 p-2 rounded-2xl border border-slate-200 dark:border-slate-700/50 focus-within:border-violet-500/50 focus-within:ring-1 focus-within:ring-violet-500/20 transition-all">
-          <input 
-            type="file" 
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            className="hidden"
-            multiple 
-            accept="image/*,video/*,.pdf,.doc,.docx,.txt"
-          />
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700/50 rounded-xl"
-          >
-            <Paperclip size={20} />
-          </button>
           
-          <textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={selectedFiles.length > 0 ? "Добавьте подпись..." : "Напишите сообщение..."}
-            className="flex-1 bg-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 resize-none focus:outline-none max-h-32 py-2"
-            rows={1}
-            style={{ minHeight: '40px' }}
-          />
-          
-          <button 
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className={`p-2 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700/50 rounded-xl ${showEmojiPicker ? 'text-violet-500 dark:text-violet-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
-          >
-            <Smile size={20} />
-          </button>
+          {isRecording ? (
+               <div className="flex-1 flex items-center justify-between px-2">
+                   <div className="flex items-center gap-3">
+                       <span className="relative flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                       </span>
+                       <span className="font-mono text-slate-700 dark:text-slate-200 font-medium">
+                           {formatDuration(recordingDuration)}
+                       </span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                       <button 
+                           onClick={cancelRecording}
+                           className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                           title="Отменить"
+                       >
+                           <Trash2 size={20} />
+                       </button>
+                       <button 
+                           onClick={() => stopRecording(true)}
+                           className="p-2 bg-violet-600 text-white rounded-full hover:bg-violet-500 transition-colors shadow-lg shadow-violet-500/30"
+                           title="Отправить"
+                       >
+                           <Send size={20} />
+                       </button>
+                   </div>
+               </div>
+          ) : (
+              <>
+                <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    multiple 
+                    accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+                />
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700/50 rounded-xl"
+                >
+                    <Paperclip size={20} />
+                </button>
+                
+                <textarea
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={selectedFiles.length > 0 ? "Добавьте подпись..." : "Напишите сообщение..."}
+                    className="flex-1 bg-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 resize-none focus:outline-none max-h-32 py-2"
+                    rows={1}
+                    style={{ minHeight: '40px' }}
+                />
+                
+                <button 
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    className={`p-2 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700/50 rounded-xl ${showEmojiPicker ? 'text-violet-500 dark:text-violet-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                >
+                    <Smile size={20} />
+                </button>
 
-          <button 
-            onClick={handleSend}
-            disabled={!inputText.trim() && selectedFiles.length === 0}
-            className={`p-2 rounded-xl transition-all ${
-                inputText.trim() || selectedFiles.length > 0
-                ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/30 hover:bg-violet-500 scale-100' 
-                : 'bg-slate-300 dark:bg-slate-700 text-slate-500 scale-95 cursor-not-allowed'
-            }`}
-          >
-            <Send size={20} />
-          </button>
+                {inputText.trim() || selectedFiles.length > 0 ? (
+                    <button 
+                        onClick={handleSend}
+                        className="p-2 rounded-xl transition-all bg-violet-600 text-white shadow-lg shadow-violet-600/30 hover:bg-violet-500 scale-100"
+                    >
+                        <Send size={20} />
+                    </button>
+                ) : (
+                    <button 
+                        onClick={startRecording}
+                        className="p-2 rounded-xl transition-all bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-violet-100 hover:text-violet-600 dark:hover:bg-violet-900/30 dark:hover:text-violet-300"
+                    >
+                        <Mic size={20} />
+                    </button>
+                )}
+              </>
+          )}
         </div>
       </div>
     </div>

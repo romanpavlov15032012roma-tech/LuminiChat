@@ -1,6 +1,6 @@
 import React from 'react';
 import { Chat, User } from '../types';
-import { Search, Menu, PenSquare, Settings, UserPlus, Phone, Hash } from 'lucide-react';
+import { Search, Menu, PenSquare, Settings, UserPlus, Phone, Hash, Mic } from 'lucide-react';
 
 interface SidebarProps {
   chats: Chat[];
@@ -39,6 +39,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
     } catch (e) {
       return '';
     }
+  };
+
+  const getPreviewText = (chat: Chat) => {
+      if (chat.isTyping) {
+          return <span className="text-violet-500 dark:text-violet-400 animate-pulse">Печатает...</span>;
+      }
+      if (!chat.lastMessage) {
+          return <span className="italic opacity-50">Черновик</span>;
+      }
+      if (chat.lastMessage.attachments && chat.lastMessage.attachments.length > 0) {
+          const lastAtt = chat.lastMessage.attachments[0];
+          if (lastAtt.type === 'audio') {
+              return <span className="flex items-center gap-1"><Mic size={12} /> Голосовое сообщение</span>;
+          }
+          if (lastAtt.type === 'image') return '📷 Фотография';
+          if (lastAtt.type === 'video') return '🎥 Видео';
+          return '📎 Файл';
+      }
+      return chat.lastMessage.text;
   };
 
   return (
@@ -136,7 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                   <div className="flex justify-between items-center">
                     <p className={`text-sm truncate ${isSelected ? 'text-violet-700 dark:text-violet-200/70' : 'text-slate-500 dark:text-slate-400'}`}>
-                      {chat.isTyping ? <span className="text-violet-500 dark:text-violet-400 animate-pulse">Печатает...</span> : chat.lastMessage?.text || <span className="italic opacity-50">Черновик</span>}
+                      {getPreviewText(chat)}
                     </p>
                     {chat.unreadCount > 0 && (
                       <span className="ml-2 bg-violet-500 text-white text-xs font-bold px-1.5 h-5 min-w-[1.25rem] flex items-center justify-center rounded-full">

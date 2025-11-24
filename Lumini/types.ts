@@ -11,10 +11,11 @@ export interface User {
 
 export interface Attachment {
   id: string;
-  type: 'image' | 'file' | 'video';
+  type: 'image' | 'file' | 'video' | 'audio';
   url: string;
   name: string;
   size?: string;
+  duration?: string; // Duration for audio/video
 }
 
 export interface Reaction {
